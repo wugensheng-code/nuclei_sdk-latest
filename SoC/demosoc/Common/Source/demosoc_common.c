@@ -57,22 +57,3 @@ void delay_1ms(uint32_t count)
         delta_mtime = SysTimer_GetLoadValue() - start_mtime;
     } while (delta_mtime < delay_ticks);
 }
-
-void simulation_exit(int status)
-{
-    // Both xlspike and qemu will write RXFIFO to make it works for xlspike even SIMU=qemu
-    // workaround for fix cycle model exit with some message not print
-    for (int i = 0; i < 10; i ++) {
-        // print '\0' instead of '\r' for qemu simulation in ide
-        uart_write(UART0, '\0');
-    }
-    uart_write(UART0, '\n');
-    // pass exit status via rxfifo register
-    UART0->RXFIFO = status;
-    uart_write(UART0, 4);
-#if SIMULATION_MODE == SIMULATION_MODE_QEMU
-    #define QEMU_VIRT_TEST_BASE 0x100000
-    #define QEMU_SIG_EXIT      0x3333
-    REG32(QEMU_VIRT_TEST_BASE) = (status << 16) | QEMU_SIG_EXIT;
-#endif
-}

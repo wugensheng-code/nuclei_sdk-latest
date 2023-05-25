@@ -32,8 +32,9 @@ extern "C" {
 #endif
 
 #include <stdint.h>
+#include "al_intr.h"
 
-extern volatile uint32_t SystemCoreClock;     /*!< System Clock Frequency (Core Clock) */
+extern volatile uint32_t SystemCoreClock;     /*!< System Clock Frequency (Core Clock)  */
 
 typedef struct EXC_Frame {
     unsigned long ra;        /* ra: x1, return address for jump */
@@ -100,7 +101,7 @@ extern void ECLIC_Init(void);
  * This function set vector mode, trigger mode and polarity, interrupt level and priority,
  * assign handler for specific IRQn.
  */
-extern int32_t ECLIC_Register_IRQ(IRQn_Type IRQn, uint8_t shv, ECLIC_TRIGGER_Type trig_mode, uint8_t lvl, uint8_t priority, void* handler);
+extern int32_t ECLIC_Register_IRQ(IRQn_Type IRQn, uint8_t shv, ECLIC_TRIGGER_Type trig_mode, uint8_t lvl, uint8_t priority, AL_INTR_HandlerStruct* handler);
 
 #if defined(__TEE_PRESENT) && (__TEE_PRESENT == 1)
 /**

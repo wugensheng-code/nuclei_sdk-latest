@@ -27,29 +27,32 @@ ENTRY( _start )
 
 MEMORY
 {
-  ilm (rxa!w) : ORIGIN = 0x80000000, LENGTH = 64K
-  ram (wxa!r) : ORIGIN = 0x90000000, LENGTH = 64K
+
+  ilm (rxai!w) : ORIGIN = 0x61000000, LENGTH = 128K
+  ram (wxa!ri) : ORIGIN = 0x61020000, LENGTH = 128K
 }
 
-REGION_ALIAS("ROM", ilm)
-REGION_ALIAS("RAM", ram)
-REGION_ALIAS("DATA_LMA", ram)
 
 SECTIONS
 {
-  /* To provide symbol __STACK_SIZE, __HEAP_SIZE and __SMP_CPU_CNT */
-  PROVIDE(__STACK_SIZE = 2K);
-  PROVIDE(__HEAP_SIZE = 2K);
-  PROVIDE(__SMP_CPU_CNT = 1);
-  __TOT_STACK_SIZE = __STACK_SIZE * __SMP_CPU_CNT;
+  __stack_size = DEFINED(__stack_size) ? __stack_size : 4K;
 
   .init           :
   {
     *(.vtable)
-    *(.vtable_s)
     KEEP (*(SORT_NONE(.init)))
+  } >ilm AT>ilm
+
+  .ilalign         :
+  {
     . = ALIGN(4);
-  } >ROM AT>ROM
+    PROVIDE( _ilm_lma = . );
+  } >ilm AT>ilm
+
+  .ialign         :
+  {
+    PROVIDE( _ilm = . );
+  } >ilm AT>ilm
 
   .text           :
   {
@@ -57,102 +60,19 @@ SECTIONS
     *(.text.startup .text.startup.*)
     *(.text .text.*)
     *(.gnu.linkonce.t.*)
-  } >ROM AT>ROM
+  } >ilm AT>ilm
 
-  .fini           :
+  .rodata : ALIGN(4)
   {
-    KEEP (*(SORT_NONE(.fini)))
-  } >ROM AT>ROM
-
-  .preinit_array  :
-  {
-    PROVIDE_HIDDEN (__preinit_array_start = .);
-    KEEP (*(.preinit_array))
-    PROVIDE_HIDDEN (__preinit_array_end = .);
-  } >ROM AT>ROM
-
-  .init_array     :
-  {
-    PROVIDE_HIDDEN (__init_array_start = .);
-    KEEP (*(SORT_BY_INIT_PRIORITY(.init_array.*) SORT_BY_INIT_PRIORITY(.ctors.*)))
-    KEEP (*(.init_array EXCLUDE_FILE (*crtbegin.o *crtbegin?.o *crtend.o *crtend?.o ) .ctors))
-    PROVIDE_HIDDEN (__init_array_end = .);
-  } >ROM AT>ROM
-
-  .fini_array     :
-  {
-    PROVIDE_HIDDEN (__fini_array_start = .);
-    KEEP (*(SORT_BY_INIT_PRIORITY(.fini_array.*) SORT_BY_INIT_PRIORITY(.dtors.*)))
-    KEEP (*(.fini_array EXCLUDE_FILE (*crtbegin.o *crtbegin?.o *crtend.o *crtend?.o ) .dtors))
-    PROVIDE_HIDDEN (__fini_array_end = .);
-  } >ROM AT>ROM
-
-  .ctors          :
-  {
-    /* gcc uses crtbegin.o to find the start of
-     * the constructors, so we make sure it is
-     * first.  Because this is a wildcard, it
-     * doesn't matter if the user does not
-     * actually link against crtbegin.o; the
-     * linker won't look for a file to match a
-     * wildcard.  The wildcard also means that it
-     * doesn't matter which directory crtbegin.o
-     * is in.
-     */
-    KEEP (*crtbegin.o(.ctors))
-    KEEP (*crtbegin?.o(.ctors))
-    /* We don't want to include the .ctor section from
-     * the crtend.o file until after the sorted ctors.
-     * The .ctor section from the crtend file contains the
-     * end of ctors marker and it must be last
-     */
-    KEEP (*(EXCLUDE_FILE (*crtend.o *crtend?.o ) .ctors))
-    KEEP (*(SORT(.ctors.*)))
-    KEEP (*(.ctors))
-  } >ROM AT>ROM
-
-  .dtors          :
-  {
-    KEEP (*crtbegin.o(.dtors))
-    KEEP (*crtbegin?.o(.dtors))
-    KEEP (*(EXCLUDE_FILE (*crtend.o *crtend?.o ) .dtors))
-    KEEP (*(SORT(.dtors.*)))
-    KEEP (*(.dtors))
-  } >ROM AT>ROM
-
-  PROVIDE( _ilm_lma = LOADADDR(.text) );
-  PROVIDE( _ilm = ADDR(.text) );
-  PROVIDE( _eilm = . );
-  PROVIDE( _text_lma = LOADADDR(.text) );
-  PROVIDE( _text = ADDR(.text) );
-  PROVIDE (_etext = .);
-  PROVIDE (__etext = .);
-  PROVIDE (etext = .);
-
-  .data            : ALIGN(8)
-  {
-    KEEP(*(.data.ctest*))
-    *(.data .data.*)
-    *(.gnu.linkonce.d.*)
-    . = ALIGN(8);
-    PROVIDE( __global_pointer$ = . + 0x800 );
-    *(.sdata .sdata.* .sdata*)
-    *(.gnu.linkonce.s.*)
-    /* readonly data placed in RAM for access speed */
-    . = ALIGN(8);
-    *(.srodata.cst16)
-    *(.srodata.cst8)
-    *(.srodata.cst4)
-    *(.srodata.cst2)
-    *(.srodata .srodata.*)
+    . = ALIGN(4);
     *(.rdata)
     *(.rodata .rodata.*)
-    *(.gnu.linkonce.r.*)
-    /* below sections are used for rt-thread */
+    /* section information for initial. */
     . = ALIGN(4);
     __rt_init_start = .;
     KEEP(*(SORT(.rti_fn*)))
     __rt_init_end = .;
+    /* section information for finsh shell */
     . = ALIGN(4);
     __fsymtab_start = .;
     KEEP(*(FSymTab))
@@ -161,36 +81,113 @@ SECTIONS
     __vsymtab_start = .;
     KEEP(*(VSymTab))
     __vsymtab_end = .;
-    . = ALIGN(8);
-  } >RAM AT>DATA_LMA
+    *(.gnu.linkonce.r.*)
 
-  .tdata           : ALIGN(8)
+  } >ilm AT>ilm
+
+  .fini           :
   {
-    PROVIDE( __tls_base = . );
-    *(.tdata .tdata.* .gnu.linkonce.td.*)
-  } >RAM AT>DATA_LMA
+    KEEP (*(SORT_NONE(.fini)))
+  } >ilm AT>ilm
 
-  PROVIDE( _data_lma = LOADADDR(.data) );
-  PROVIDE( _data = ADDR(.data) );
+  . = ALIGN(4);
+
+  PROVIDE (__etext = .);
+  PROVIDE (_etext = .);
+  PROVIDE (etext = .);
+  PROVIDE( _eilm = . );
+
+
+  .preinit_array  :
+  {
+    PROVIDE_HIDDEN (__preinit_array_start = .);
+    KEEP (*(.preinit_array))
+    PROVIDE_HIDDEN (__preinit_array_end = .);
+  } >ilm AT>ilm
+
+  .init_array     :
+  {
+    PROVIDE_HIDDEN (__init_array_start = .);
+    KEEP (*(SORT_BY_INIT_PRIORITY(.init_array.*) SORT_BY_INIT_PRIORITY(.ctors.*)))
+    KEEP (*(.init_array EXCLUDE_FILE (*crtbegin.o *crtbegin?.o *crtend.o *crtend?.o ) .ctors))
+    PROVIDE_HIDDEN (__init_array_end = .);
+  } >ilm AT>ilm
+
+  .fini_array     :
+  {
+    PROVIDE_HIDDEN (__fini_array_start = .);
+    KEEP (*(SORT_BY_INIT_PRIORITY(.fini_array.*) SORT_BY_INIT_PRIORITY(.dtors.*)))
+    KEEP (*(.fini_array EXCLUDE_FILE (*crtbegin.o *crtbegin?.o *crtend.o *crtend?.o ) .dtors))
+    PROVIDE_HIDDEN (__fini_array_end = .);
+  } >ilm AT>ilm
+
+  .ctors          :
+  {
+    /* gcc uses crtbegin.o to find the start of
+       the constructors, so we make sure it is
+       first.  Because this is a wildcard, it
+       doesn't matter if the user does not
+       actually link against crtbegin.o; the
+       linker won't look for a file to match a
+       wildcard.  The wildcard also means that it
+       doesn't matter which directory crtbegin.o
+       is in.  */
+    KEEP (*crtbegin.o(.ctors))
+    KEEP (*crtbegin?.o(.ctors))
+    /* We don't want to include the .ctor section from
+       the crtend.o file until after the sorted ctors.
+       The .ctor section from the crtend file contains the
+       end of ctors marker and it must be last */
+    KEEP (*(EXCLUDE_FILE (*crtend.o *crtend?.o ) .ctors))
+    KEEP (*(SORT(.ctors.*)))
+    KEEP (*(.ctors))
+  } >ilm AT>ilm
+
+  .dtors          :
+  {
+    KEEP (*crtbegin.o(.dtors))
+    KEEP (*crtbegin?.o(.dtors))
+    KEEP (*(EXCLUDE_FILE (*crtend.o *crtend?.o ) .dtors))
+    KEEP (*(SORT(.dtors.*)))
+    KEEP (*(.dtors))
+  } >ilm AT>ilm
+
+
+  .lalign         :
+  {
+    . = ALIGN(4);
+    PROVIDE( _data_lma = . );
+  } >ilm AT>ilm
+
+  .dalign         :
+  {
+    . = ALIGN(4);
+    PROVIDE( _data = . );
+  } >ram AT>ilm
+
+  .data          :
+  {
+    *(.data .data.*)
+    *(.gnu.linkonce.d.*)
+    . = ALIGN(8);
+    PROVIDE( __global_pointer$ = . + 0x800 );
+    *(.sdata .sdata.* .sdata*)
+    *(.gnu.linkonce.s.*)
+    . = ALIGN(8);
+    *(.srodata.cst16)
+    *(.srodata.cst8)
+    *(.srodata.cst4)
+    *(.srodata.cst2)
+    *(.srodata .srodata.*)
+  } >ram AT>ilm
+
+  . = ALIGN(4);
   PROVIDE( _edata = . );
   PROVIDE( edata = . );
 
   PROVIDE( _fbss = . );
   PROVIDE( __bss_start = . );
-
-  .tbss (NOLOAD)   : ALIGN(8)
-  {
-    *(.tbss .tbss.* .gnu.linkonce.tb.*)
-    *(.tcommon)
-    PROVIDE( __tls_end = . );
-  } >RAM AT>RAM
-
-  .tbss_space (NOLOAD) : ALIGN(8)
-  {
-    . = . + SIZEOF(.tbss);
-  } >RAM AT>RAM
-
-  .bss (NOLOAD)   : ALIGN(8)
+  .bss            :
   {
     *(.sbss*)
     *(.gnu.linkonce.sb.*)
@@ -198,35 +195,17 @@ SECTIONS
     *(.gnu.linkonce.b.*)
     *(COMMON)
     . = ALIGN(4);
-  } >RAM AT>RAM
+  } >ram AT>ram
 
+  . = ALIGN(8);
   PROVIDE( _end = . );
   PROVIDE( end = . );
+  PROVIDE(_heap_start = . );
 
-  /* Nuclei C Runtime Library requirements:
-   * 1. heap need to be align at 16 bytes
-   * 2. __heap_start and __heap_end symbol need to be defined
-   * 3. reserved at least __HEAP_SIZE space for heap
-   */
-  .heap (NOLOAD)   : ALIGN(16)
+  .stack ORIGIN(ram) + LENGTH(ram) - __stack_size :
   {
-    . = ALIGN(16);
-    PROVIDE( __heap_start = . );
-    . += __HEAP_SIZE;
-    . = ALIGN(16);
-    PROVIDE( __heap_limit = . );
-  } >RAM AT>RAM
-
-  .stack ORIGIN(RAM) + LENGTH(RAM) - __TOT_STACK_SIZE (NOLOAD) :
-  {
-    . = ALIGN(16);
     PROVIDE( _heap_end = . );
-    PROVIDE( __heap_end = . );
-    PROVIDE( __StackLimit = . );
-    PROVIDE( __StackBottom = . );
-    . += __TOT_STACK_SIZE;
-    . = ALIGN(16);
-    PROVIDE( __StackTop = . );
+    . = __stack_size;
     PROVIDE( _sp = . );
-  } >RAM AT>RAM
+  } >ram AT>ram
 }

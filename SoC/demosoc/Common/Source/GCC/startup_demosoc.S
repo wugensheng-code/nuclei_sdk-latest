@@ -26,10 +26,7 @@
 
 #include "riscv_encoding.h"
 
-/* If BOOT_HARTID is not defined, default value is 0 */
-#ifndef BOOT_HARTID
-    .equ BOOT_HARTID,    0
-#endif
+#define MAX_INTR    (130)
 
 .macro DECLARE_INT_HANDLER  INT_HDL_NAME
 #if defined(__riscv_xlen) && (__riscv_xlen == 32)
@@ -39,106 +36,45 @@
 #endif
 .endm
 
+/*
+ * === Different Download and Running Mode ===
+ * flashxip: Program will to be download into flash and run directly in Flash
+ * flash: Program will be download into flash, when running, program will be copied to ilm/ram and run in ilm/ram
+ * ilm: Program will be download into ilm/ram and run directly in ilm/ram, program lost when poweroff
+ */
+
+/*** Vector Table Code Section ***/
+    /*
+     * Put the interrupt vectors in this section according to the run mode:
+     * FlashXIP: .vtable
+     * ILM: .vtable
+     * Flash: .vtable_ilm
+     */
+// #if defined(DOWNLOAD_MODE) && (DOWNLOAD_MODE == DOWNLOAD_MODE_FLASH)
+//     .section .vtable_ilm
+// #else
+//     .section .vtable
+// #endif
+
     .section .vtable
 
-    .weak eclic_msip_handler
-    .weak eclic_mtip_handler
-    .weak eclic_uart0_int_handler
-    .weak eclic_inter_core_int_handler
+.rept MAX_INTR
+    DECLARE_INT_HANDLER     default_intexc_handler          /* 1: Reserved */
+.endr
+
+
     .globl vector_base
     .type vector_base, @object
 vector_base:
-#ifndef VECTOR_TABLE_REMAPPED
-    j _start                                                /* 0: Reserved, Jump to _start when reset for vector table not remapped cases.*/
+#if defined(DOWNLOAD_MODE) && (DOWNLOAD_MODE != DOWNLOAD_MODE_FLASH)
+    j _start                                                /* 0: Reserved, Jump to _start when reset for ILM/FlashXIP mode.*/
     .align LOG_REGBYTES                                     /*    Need to align 4 byte for RV32, 8 Byte for RV64 */
 #else
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 0: Reserved, default handler for vector table remapped cases */
+    DECLARE_INT_HANDLER     default_intexc_handler          /* 0: Reserved, default handler for Flash download mode */
 #endif
+.rept MAX_INTR
     DECLARE_INT_HANDLER     default_intexc_handler          /* 1: Reserved */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 2: Reserved */
-    DECLARE_INT_HANDLER     eclic_msip_handler              /* 3: Machine software interrupt */
-
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 4: Reserved */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 5: Reserved */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 6: Reserved */
-    DECLARE_INT_HANDLER     eclic_mtip_handler              /* 7: Machine timer interrupt */
-
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 8: Reserved */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 9: Reserved */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 10: Reserved */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 11: Reserved */
-
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 12: Reserved */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 13: Reserved */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 14: Reserved */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 15: Reserved */
-
-    DECLARE_INT_HANDLER     eclic_inter_core_int_handler    /* 16: CIDU Inter Core Interrupt */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 17: Reserved */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 18: Reserved */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 19: Interrupt 19 */
-
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 20: Interrupt 20 */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 21: Interrupt 21 */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 22: Interrupt 22 */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 23: Interrupt 23 */
-
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 24: Interrupt 24 */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 25: Interrupt 25 */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 26: Interrupt 26 */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 27: Interrupt 27 */
-
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 28: Interrupt 28 */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 29: Interrupt 29 */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 30: Interrupt 30 */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 31: Interrupt 31 */
-
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 32: Interrupt 32 */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 33: Interrupt 33 */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 34: Interrupt 34 */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 35: Interrupt 35 */
-
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 36: Interrupt 36 */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 37: Interrupt 37 */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 38: Interrupt 38 */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 39: Interrupt 39 */
-
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 40: Interrupt 40 */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 41: Interrupt 41 */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 42: Interrupt 42 */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 43: Interrupt 43 */
-
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 44: Interrupt 44 */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 45: Interrupt 45 */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 46: Interrupt 46 */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 47: Interrupt 47 */
-
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 48: Interrupt 48 */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 49: Interrupt 49 */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 50: Interrupt 50 */
-    DECLARE_INT_HANDLER     eclic_uart0_int_handler         /* 51: UART0 Interrupt */
-
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 52: Interrupt 52 */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 53: Interrupt 53 */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 54: Interrupt 54 */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 55: Interrupt 55 */
-
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 56: Interrupt 56 */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 57: Interrupt 57 */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 58: Interrupt 58 */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 59: Interrupt 59 */
-
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 60: Interrupt 60 */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 61: Interrupt 61 */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 62: Interrupt 62 */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 63: Interrupt 63 */
-
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 64: Interrupt 64 */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 65: Interrupt 65 */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 66: Interrupt 66 */
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 67: Interrupt 67 */
-
-    DECLARE_INT_HANDLER     default_intexc_handler          /* 68: Interrupt 68 */
+.endr
 
     .section .init
 
@@ -153,46 +89,12 @@ _start:
     /* Disable Global Interrupt */
     csrc CSR_MSTATUS, MSTATUS_MIE
 
-    /* If SMP_CPU_CNT is not defined,
-     * assume that only 1 core is allowed to run,
-     * the core hartid is defined via BOOT_HARTID.
-     * other harts if run to here, just do wfi in __amp_wait
-     */
-#ifndef SMP_CPU_CNT
-    /* take bit 0-7 for hart id in a local cluster */
-    csrr a0, CSR_MHARTID
-    andi a0, a0, 0xFF
-    /* BOOT_HARTID is configurable in Makefile via BOOT_HARTID variable */
-    li a1, BOOT_HARTID
-    bne a0, a1, __amp_wait
-#endif
-
-    /* Initialize GP and TP */
+    /* Initialize GP and Stack Pointer SP */
     .option push
     .option norelax
     la gp, __global_pointer$
-    la tp, __tls_base
     .option pop
-
-#if defined(SMP_CPU_CNT) && (SMP_CPU_CNT > 1)
-    /* Set correct sp for each cpu
-     * each stack size is __STACK_SIZE
-     * defined in linker script */
-    la t0, __STACK_SIZE
     la sp, _sp
-    csrr a0, CSR_MHARTID
-    andi a0, a0, 0xFF
-    li a1, 0
-1:
-    beq a0, a1, 2f
-    sub sp, sp, t0
-    addi a1, a1, 1
-    j 1b
-2:
-#else
-    /* Set correct sp for current cpu */
-    la sp, _sp
-#endif
 
     /*
      * Set the the NMI base mnvec to share
@@ -201,6 +103,21 @@ _start:
      */
     li t0, MMISC_CTL_NMI_CAUSE_FFF
     csrs CSR_MMISC_CTL, t0
+
+    li t0, MMISC_CTL_BPU
+    csrs CSR_MMISC_CTL, t0
+
+// #if defined FPGA_STAGE_7
+// #if defined RPU_FSBL_SIMU
+//    li t0, (1<<3)
+//    csrc CSR_MMISC_CTL, t0       //BPU: 1(default) enable, 0: disable ,csrc clear the enable bit
+//    li t0, (1<<12)
+//    csrs CSR_MMISC_CTL, t0
+// #endif
+// #else
+//   li t0, MMISC_CTL_NMI_CAUSE_FFF
+//   csrs CSR_MMISC_CTL, t0
+// #endif
 
     /*
      * Intialize ECLIC vector interrupt
@@ -220,13 +137,11 @@ _start:
     csrs CSR_MTVT2, 0x1
 
     /*
-     * Set Exception Entry MTVEC to early_exc_entry
+     * Set Exception Entry MTVEC to exc_entry
      * Due to settings above, Exception and NMI
      * will share common entry.
-     * This early_exc_entry is only used during early
-     * boot stage before main
      */
-    la t0, early_exc_entry
+    la t0, exc_entry
     csrw CSR_MTVEC, t0
 
     /* Set the interrupt processing mode to ECLIC mode */
@@ -236,45 +151,26 @@ _start:
 
     /* ===== Startup Stage 2 ===== */
 
-    /* Enable FPU and Vector Unit if f/d/v exist in march */
-#if defined(__riscv_flen) && __riscv_flen > 0
-    /* Enable FPU, and set state to initial */
+#ifdef __riscv_flen
+    /* Enable FPU */
     li t0, MSTATUS_FS
-    csrc mstatus, t0
-    li t0, MSTATUS_FS_INITIAL
     csrs mstatus, t0
-#endif
-
-#if defined(__riscv_vector)
-    /* Enable Vector, and set state to initial */
-    li t0, MSTATUS_VS
-    csrc mstatus, t0
-    li t0, MSTATUS_VS_INITIAL
-    csrs mstatus, t0
+    csrw fcsr, x0
 #endif
 
     /* Enable mcycle and minstret counter */
     csrci CSR_MCOUNTINHIBIT, 0x5
 
-#if defined(SMP_CPU_CNT) && (SMP_CPU_CNT > 1)
-    csrr a0, CSR_MHARTID
-    andi a0, a0, 0xFF
-    li a1, BOOT_HARTID
-    bne a0, a1, __skip_init
-#endif
-
-__init_common:
     /* ===== Startup Stage 3 ===== */
     /*
-     * Load text section from CODE ROM to CODE RAM
-     * when text LMA is different with VMA
+     * Load code section from FLASH to ILM
+     * when code LMA is different with VMA
      */
-    la a0, _text_lma
-    la a1, _text
-    /* If text LMA and VMA are equal
-     * then no need to copy text section */
+    la a0, _ilm_lma
+    la a1, _ilm
+    /* If the ILM phy-address same as the logic-address, then quit */
     beq a0, a1, 2f
-    la a2, _etext
+    la a2, _eilm
     bgeu a1, a2, 2f
 
 1:
@@ -288,8 +184,6 @@ __init_common:
     /* Load data section */
     la a0, _data_lma
     la a1, _data
-    /* If data vma=lma, no need to copy */
-    beq a0, a1, 2f
     la a2, _edata
     bgeu a1, a2, 2f
 1:
@@ -309,13 +203,9 @@ __init_common:
     bltu a0, a1, 1b
 2:
 
-.globl _start_premain
-.type _start_premain, @function
-_start_premain:
     /*
      * Call vendor defined SystemInit to
      * initialize the micro-controller system
-     * SystemInit will just be called by boot cpu
      */
     call SystemInit
 
@@ -325,92 +215,21 @@ _start_premain:
     /* Call C/C++ constructor start up code */
     call __libc_init_array
 
-__skip_init:
-    /* Sync all harts at this function */
-    call __sync_harts
-
     /* do pre-init steps before main */
-    /* _premain_init will be called by each cpu
-     * please make sure the implementation of __premain_int
-     * considered this
-     */
     call _premain_init
-
-    /*
-     * When all initialization steps done
-     * set exception entry to correct exception
-     * entry and jump to main.
-     * And set the interrupt processing mode to
-     * ECLIC mode
-     */
-    la t0, exc_entry
-    csrw CSR_MTVEC, t0
-    li t0, 0x3f
-    csrc CSR_MTVEC, t0
-    csrs CSR_MTVEC, 0x3
-
-    /* BPU cold bringup need time, so enable BPU before enter to main */
-    li t0, MMISC_CTL_BPU
-    csrs CSR_MMISC_CTL, t0
-
-    /* ===== Call SMP Main Function  ===== */
+    /* ===== Call Main Function  ===== */
     /* argc = argv = 0 */
     li a0, 0
     li a1, 0
-#if defined(SMP_CPU_CNT) && (SMP_CPU_CNT > 1)
-    /* The weak implementation of smp_main is in this file */
-    call smp_main
-#else
+
 #ifdef RTOS_RTTHREAD
     // Call entry function when using RT-Thread
     call entry
 #else
     call main
 #endif
-#endif
-    /* do post-main steps after main
-     * this function will be called by each cpu */
+    /* do post-main steps after main */
     call _postmain_fini
 
-__amp_wait:
 1:
-    wfi
     j 1b
-
-#if defined(SMP_CPU_CNT) && (SMP_CPU_CNT > 1)
-/*
- * You can re-implement smp_main function in your code
- * to do smp boot process and handle multi harts
- */
-.weak smp_main
-.type smp_main, @function
-smp_main:
-    addi sp, sp, -2*REGBYTES
-    STORE ra, 0*REGBYTES(sp)
-    /* only boot hart goto main, other harts do wfi */
-    csrr t0, CSR_MHARTID
-    andi t0, t0, 0xFF
-    li t1, BOOT_HARTID
-    beq t0, t1, 2f
-1:
-    wfi
-    j 1b
-2:
-#ifdef RTOS_RTTHREAD
-    // Call entry function when using RT-Thread
-    call entry
-#else
-    call main
-#endif
-    LOAD ra, 0*REGBYTES(sp)
-    addi sp, sp, 2*REGBYTES
-    ret
-#endif
-
-/* Early boot exception entry before main */
-.align 6
-.global early_exc_entry
-.type early_exc_entry, @function
-early_exc_entry:
-    wfi
-    j early_exc_entry

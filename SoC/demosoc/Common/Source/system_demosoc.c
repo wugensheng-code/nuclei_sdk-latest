@@ -26,6 +26,12 @@
 #include <stdint.h>
 #include <stdio.h>
 #include "nuclei_sdk_hal.h"
+#include "rtthread.h"
+#define DBG_TAG               "system"
+
+#define DBG_LVL               DBG_LOG
+
+#include <rtdbg.h>
 
 /*----------------------------------------------------------------------------
   Define clocks
@@ -304,11 +310,11 @@ typedef void (*EXC_HANDLER)(unsigned long cause, unsigned long sp);
 static void system_default_exception_handler(unsigned long mcause, unsigned long sp)
 {
     /* TODO: Uncomment this if you have implement printf function */
-    printf("MCAUSE : 0x%lx\r\n", mcause);
-    printf("MDCAUSE: 0x%lx\r\n", __RV_CSR_READ(CSR_MDCAUSE));
-    printf("MEPC   : 0x%lx\r\n", __RV_CSR_READ(CSR_MEPC));
-    printf("MTVAL  : 0x%lx\r\n", __RV_CSR_READ(CSR_MTVAL));
-    printf("HARTID : %u\r\n", (unsigned int)__get_hart_id());
+    LOG_D("MCAUSE : 0x%lx\r\n", mcause);
+    LOG_D("MDCAUSE: 0x%lx\r\n", __RV_CSR_READ(CSR_MDCAUSE));
+    LOG_D("MEPC   : 0x%lx\r\n", __RV_CSR_READ(CSR_MEPC));
+    LOG_D("MTVAL  : 0x%lx\r\n", __RV_CSR_READ(CSR_MTVAL));
+    LOG_D("HARTID : %u\r\n", (unsigned int)__get_hart_id());
     Exception_DumpFrame(sp, PRV_M);
 #if defined(SIMULATION_MODE)
     // directly exit if in SIMULATION
@@ -327,16 +333,16 @@ static void system_default_exception_handler(unsigned long mcause, unsigned long
  * Called in \ref _init function, used to initialize default exception handlers for all exception IDs
  * SystemExceptionHandlers contains NMI, but SystemExceptionHandlers_S not, because NMI can't be delegated to S-mode.
  */
-static void Exception_Init(void)
-{
-    for (int i = 0; i < MAX_SYSTEM_EXCEPTION_NUM; i++) {
-        SystemExceptionHandlers[i] = (unsigned long)system_default_exception_handler;
-#if defined(__TEE_PRESENT) && (__TEE_PRESENT == 1)
-        SystemExceptionHandlers_S[i] = (unsigned long)system_default_exception_handler_s;
-#endif
-    }
-    SystemExceptionHandlers[MAX_SYSTEM_EXCEPTION_NUM] = (unsigned long)system_default_exception_handler;
-}
+// static void Exception_Init(void)
+// {
+//     for (int i = 0; i < MAX_SYSTEM_EXCEPTION_NUM; i++) {
+//         SystemExceptionHandlers[i] = (unsigned long)system_default_exception_handler;
+// #if defined(__TEE_PRESENT) && (__TEE_PRESENT == 1)
+//         SystemExceptionHandlers_S[i] = (unsigned long)system_default_exception_handler_s;
+// #endif
+//     }
+//     SystemExceptionHandlers[MAX_SYSTEM_EXCEPTION_NUM] = (unsigned long)system_default_exception_handler;
+// }
 
 /**
  * \brief      Dump Exception Frame
@@ -488,29 +494,29 @@ void ECLIC_Init(void)
  * - This function use to configure specific eclic interrupt and register its interrupt handler and enable its interrupt.
  * - If the vector table is placed in read-only section(FLASHXIP mode), handler could not be installed
  */
-int32_t ECLIC_Register_IRQ(IRQn_Type IRQn, uint8_t shv, ECLIC_TRIGGER_Type trig_mode, uint8_t lvl, uint8_t priority, void* handler)
-{
-    if ((IRQn > SOC_INT_MAX) || (shv > ECLIC_VECTOR_INTERRUPT) \
-        || (trig_mode > ECLIC_NEGTIVE_EDGE_TRIGGER)) {
-        return -1;
-    }
+// int32_t ECLIC_Register_IRQ(IRQn_Type IRQn, uint8_t shv, ECLIC_TRIGGER_Type trig_mode, uint8_t lvl, uint8_t priority, void* handler)
+// {
+//     if ((IRQn > SOC_INT_MAX) || (shv > ECLIC_VECTOR_INTERRUPT) \
+//         || (trig_mode > ECLIC_NEGTIVE_EDGE_TRIGGER)) {
+//         return -1;
+//     }
 
-    /* set interrupt vector mode */
-    ECLIC_SetShvIRQ(IRQn, shv);
-    /* set interrupt trigger mode and polarity */
-    ECLIC_SetTrigIRQ(IRQn, trig_mode);
-    /* set interrupt level */
-    ECLIC_SetLevelIRQ(IRQn, lvl);
-    /* set interrupt priority */
-    ECLIC_SetPriorityIRQ(IRQn, priority);
-    if (handler != NULL) {
-        /* set interrupt handler entry to vector table */
-        ECLIC_SetVector(IRQn, (rv_csr_t)handler);
-    }
-    /* enable interrupt */
-    ECLIC_EnableIRQ(IRQn);
-    return 0;
-}
+//     /* set interrupt vector mode */
+//     ECLIC_SetShvIRQ(IRQn, shv);
+//     /* set interrupt trigger mode and polarity */
+//     ECLIC_SetTrigIRQ(IRQn, trig_mode);
+//     /* set interrupt level */
+//     ECLIC_SetLevelIRQ(IRQn, lvl);
+//     /* set interrupt priority */
+//     ECLIC_SetPriorityIRQ(IRQn, priority);
+//     if (handler != NULL) {
+//         /* set interrupt handler entry to vector table */
+//         ECLIC_SetVector(IRQn, (rv_csr_t)handler);
+//     }
+//     /* enable interrupt */
+//     ECLIC_EnableIRQ(IRQn);
+//     return 0;
+// }
 
 #if defined(__TEE_PRESENT) && (__TEE_PRESENT == 1)
 /**
@@ -644,26 +650,6 @@ int32_t ECLIC_Register_IRQ_S(IRQn_Type IRQn, uint8_t shv, ECLIC_TRIGGER_Type tri
 #define FALLBACK_DEFAULT_ECLIC_BASE             0x0C000000UL
 #define FALLBACK_DEFAULT_SYSTIMER_BASE          0x02000000UL
 
-volatile IRegion_Info_Type SystemIRegionInfo;
-static void _get_iregion_info(IRegion_Info_Type *iregion)
-{
-    unsigned long mcfg_info;
-    if (iregion == NULL) {
-        return;
-    }
-    mcfg_info = __RV_CSR_READ(CSR_MCFG_INFO);
-    if (mcfg_info & MCFG_INFO_IREGION_EXIST) { // IRegion Info present
-        iregion->iregion_base = (__RV_CSR_READ(CSR_MIRGB_INFO) >> 10) << 10;
-        iregion->eclic_base = iregion->iregion_base + IREGION_ECLIC_OFS;
-        iregion->systimer_base = iregion->iregion_base + IREGION_TIMER_OFS;
-        iregion->smp_base = iregion->iregion_base + IREGION_SMP_OFS;
-        iregion->idu_base = iregion->iregion_base + IREGION_IDU_OFS;
-    } else {
-        iregion->eclic_base = FALLBACK_DEFAULT_ECLIC_BASE;
-        iregion->systimer_base = FALLBACK_DEFAULT_SYSTIMER_BASE;
-    }
-}
-
 /**
  * \brief Synchronize all harts
  * \details
@@ -757,17 +743,6 @@ static void Trap_Init(void)
  */
 void _premain_init(void)
 {
-    // TODO to make it possible for configurable boot hartid
-    unsigned long hartid = __get_hart_id();
-
-    // BOOT_HARTID is defined <Device.h>
-    if (hartid == BOOT_HARTID) { // only done in boot hart
-        // IREGION INFO MUST BE SET BEFORE ANY PREMAIN INIT STEPS
-        _get_iregion_info((IRegion_Info_Type *)(&SystemIRegionInfo));
-    }
-    /* TODO: Add your own initialization code here, called before main */
-    // This code located in RUNMODE_CONTROL ifdef endif block just for internal usage
-    // No need to use in your code
 #ifdef RUNMODE_CONTROL
 #if defined(RUNMODE_ILM_EN) && RUNMODE_ILM_EN == 0
     __RV_CSR_CLEAR(CSR_MILM_CTL, MILM_CTL_ILM_EN);
@@ -797,17 +772,15 @@ void _premain_init(void)
     __RWMB();
     __FENCE_I();
 
-    if (hartid == BOOT_HARTID) { // only required for boot hartid
-        SystemCoreClock = get_cpu_freq();
-        gpio_iof_config(GPIO, IOF0_UART0_MASK, IOF_SEL_0);
-        uart_init(SOC_DEBUG_UART, 115200);
-        /* Display banner after UART initialized */
-        SystemBannerPrint();
-        /* Initialize exception default handlers */
-        Exception_Init();
-        /* ECLIC initialization, mainly MTH and NLBIT */
-        ECLIC_Init();
-        Trap_Init();
+
+    /* Display banner after UART initialized */
+    SystemBannerPrint();
+    /* Initialize exception default handlers */
+    Exception_Init();
+    /* ECLIC initialization, mainly MTH and NLBIT */
+    ECLIC_Init();
+    Trap_Init();
+    // AlLog_Init();
 #ifdef RUNMODE_CONTROL
         printf("Current RUNMODE=%s, ilm:%d, dlm %d, icache %d, dcache %d, ccm %d\n", \
             RUNMODE_STRING, RUNMODE_ILM_EN, RUNMODE_DLM_EN, \
@@ -816,7 +789,6 @@ void _premain_init(void)
             __RV_CSR_READ(CSR_MILM_CTL), __RV_CSR_READ(CSR_MDLM_CTL), \
             __RV_CSR_READ(CSR_MCACHE_CTL));
 #endif
-    }
 }
 
 /**
@@ -831,8 +803,7 @@ void _premain_init(void)
 void _postmain_fini(int status)
 {
     /* TODO: Add your own finishing code here, called after main */
-    extern void simulation_exit(int status);
-    simulation_exit(status);
+
 }
 
 /**

@@ -1,19 +1,23 @@
-/* See LICENSE of license details. */
 #include "nuclei_sdk_soc.h"
 #include <stdint.h>
 #include <stddef.h>
 #include <unistd.h>
 
+extern const char _heap_start; /* Defined by the linker */
+extern const char _heap_end;   /* Defined by the linker */
+
+const void * heap_start_ptr = (const char *)&_heap_start;  /* pointer to start of heap */
+const void * heap_end_ptr   = (const char *)&_heap_end;    /* pointer to end of heap */
+
+static void * cur_heap      = (void *)&_heap_start;
+
 __WEAK void* _sbrk(ptrdiff_t incr)
 {
-    extern char __heap_start[];
-    extern char __heap_end[];
-    static char* curbrk = __heap_start;
-
-    if ((curbrk + incr < __heap_start) || (curbrk + incr > __heap_end)) {
-        return (void*)(-1);
+    if ((cur_heap + incr > heap_end_ptr) ||
+        (cur_heap + incr < heap_start_ptr)) {
+        return (void*)-1;
+    } else {
+        cur_heap += incr;
+        return (cur_heap - incr);
     }
-
-    curbrk += incr;
-    return (void*)(curbrk - incr);
 }
